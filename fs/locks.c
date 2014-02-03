@@ -137,8 +137,8 @@
 
 #define IS_POSIX(fl)	(fl->fl_flags & FL_POSIX)
 #define IS_FLOCK(fl)	(fl->fl_flags & FL_FLOCK)
-#define IS_LEASE(fl)	(fl->fl_flags & (FL_LEASE|FL_DELEG))
-#define IS_OFDLCK(fl)	(fl->fl_flags & FL_OFDLCK)
+#define IS_LEASE(fl)	(fl->fl_flags & FL_LEASE)
+#define IS_FILE_PVT(fl)	(fl->fl_flags & FL_FILE_PVT)
 
 static bool lease_breaking(struct file_lock *fl)
 {
@@ -2473,11 +2473,11 @@ static void lock_get_status(struct seq_file *f, struct file_lock *fl,
 	seq_printf(f, "%lld:%s ", id, pfx);
 	if (IS_POSIX(fl)) {
 		if (fl->fl_flags & FL_ACCESS)
-			seq_puts(f, "ACCESS");
-		else if (IS_OFDLCK(fl))
-			seq_puts(f, "OFDLCK");
+			seq_printf(f, "ACCESS");
+		else if (IS_FILE_PVT(fl))
+			seq_printf(f, "FLPVT ");
 		else
-			seq_puts(f, "POSIX ");
+			seq_printf(f, "POSIX ");
 
 		seq_printf(f, " %s ",
 			     (inode == NULL) ? "*NOINODE*" :
