@@ -403,20 +403,17 @@ SYSCALL_DEFINE3(fcntl64, unsigned int, fd, unsigned int, cmd,
 		goto out1;
 	
 	switch (cmd) {
-	case F_GETLK64:
-	case F_OFD_GETLK:
-		err = fcntl_getlk64(f.file, cmd, (struct flock64 __user *) arg);
-		break;
-	case F_SETLK64:
-	case F_SETLKW64:
-	case F_OFD_SETLK:
-	case F_OFD_SETLKW:
-		err = fcntl_setlk64(fd, f.file, cmd,
-				(struct flock64 __user *) arg);
-		break;
-	default:
-		err = do_fcntl(fd, cmd, arg, f.file);
-		break;
+		case F_GETLK64:
+			err = fcntl_getlk64(f.file, cmd, (struct flock64 __user *) arg);
+			break;
+		case F_SETLK64:
+		case F_SETLKW64:
+			err = fcntl_setlk64(fd, f.file, cmd,
+					(struct flock64 __user *) arg);
+			break;
+		default:
+			err = do_fcntl(fd, cmd, arg, f.file);
+			break;
 	}
 out1:
 	fdput(f);
