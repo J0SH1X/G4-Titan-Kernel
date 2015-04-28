@@ -3400,6 +3400,15 @@ static void tcp_snd_una_update(struct tcp_sock *tp, u32 ack)
 	tp->snd_una = ack;
 }
 
+/* If we update tp->rcv_nxt, also update tp->bytes_received */
+static void tcp_rcv_nxt_update(struct tcp_sock *tp, u32 seq)
+{
+	u32 delta = seq - tp->rcv_nxt;
+
+	tp->bytes_received += delta;
+	tp->rcv_nxt = seq;
+}
+
 /* Update our send window.
  *
  * Window update algorithm, described in RFC793/RFC1122 (used in linux-2.2
@@ -4380,12 +4389,12 @@ static void tcp_ofo_queue(struct sock *sk)
                tp->rcv_nxt, TCP_SKB_CB(skb)->seq,
                TCP_SKB_CB(skb)->end_seq);
 
-        __skb_unlink(skb, &tp->out_of_order_queue);
-        __skb_queue_tail(&sk->sk_receive_queue, skb);
-        tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
-        if (tcp_hdr(skb)->fin)
-            tcp_fin(sk);
-    }
+		__skb_unlink(skb, &tp->out_of_order_queue);
+		__skb_queue_tail(&sk->sk_receive_queue, skb);
+		tcp_rcv_nxt_update(tp, TCP_SKB_CB(skb)->end_seq);
+		if (tcp_hdr(skb)->fin)
+			tcp_fin(sk);
+	}
 }
 
 #ifndef CONFIG_LGP_DATA_TCPIP_MPTCP
@@ -4619,15 +4628,15 @@ static int __must_check tcp_queue_rcv(struct sock *sk, struct sk_buff *skb, int 
     int eaten;
     struct sk_buff *tail = skb_peek_tail(&sk->sk_receive_queue);
 
-    __skb_pull(skb, hdrlen);
-    eaten = (tail &&
-         tcp_try_coalesce(sk, tail, skb, fragstolen)) ? 1 : 0;
-    tcp_sk(sk)->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
-    if (!eaten) {
-        __skb_queue_tail(&sk->sk_receive_queue, skb);
-        skb_set_owner_r(skb, sk);
-    }
-    return eaten;
+	__skb_pull(skb, hdrlen);
+	eaten = (tail &&
+		 tcp_try_coalesce(sk, tail, skb, fragstolen)) ? 1 : 0;
+	tcp_rcv_nxt_update(tcp_sk(sk), TCP_SKB_CB(skb)->end_seq);
+	if (!eaten) {
+		__skb_queue_tail(&sk->sk_receive_queue, skb);
+		skb_set_owner_r(skb, sk);
+	}
+	return eaten;
 }
 
 int tcp_send_rcvq(struct sock *sk, struct msghdr *msg, size_t size)
@@ -4726,17 +4735,17 @@ queue_and_out:
                 tcp_try_rmem_schedule(sk, skb, skb->truesize))
                 goto drop;
 
-            eaten = tcp_queue_rcv(sk, skb, 0, &fragstolen);
-        }
-        tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
+			eaten = tcp_queue_rcv(sk, skb, 0, &fragstolen);
+		}
+		tcp_rcv_nxt_update(tp, TCP_SKB_CB(skb)->end_seq);
 #ifdef CONFIG_LGP_DATA_TCPIP_MPTCP
 		if (skb->len || mptcp_is_data_fin(skb))
 #else
         if (skb->len)
 #endif
-            tcp_event_data_recv(sk, skb);
-        if (th->fin)
-            tcp_fin(sk);
+			tcp_event_data_recv(sk, skb);
+		if (th->fin)
+			tcp_fin(sk);
 
         if (!skb_queue_empty(&tp->out_of_order_queue)) {
             tcp_ofo_queue(sk);
@@ -5564,6 +5573,16 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
          * is automatically equal to th->doff*4 due to pred_flags
          * match.
          */
+					__skb_pull(skb, tcp_header_len);
+					tcp_rcv_nxt_update(tp, TCP_SKB_CB(skb)->end_seq);
+					NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPHPHITSTOUSER);
+				}
+				if (copied_early)
+					tcp_cleanup_rbuf(sk, skb->len);
+			}
+			if (!eaten) {
+				if (tcp_checksum_complete_user(sk, skb))
+					goto csum_error;
 
         /* Check timestamp */
         if (tcp_header_len == sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED) {
