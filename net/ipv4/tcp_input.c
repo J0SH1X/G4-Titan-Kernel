@@ -3391,6 +3391,15 @@ static inline bool tcp_may_update_window(const struct tcp_sock *tp,
         (ack_seq == tp->snd_wl1 && nwin > tp->snd_wnd);
 }
 
+/* If we update tp->snd_una, also update tp->bytes_acked */
+static void tcp_snd_una_update(struct tcp_sock *tp, u32 ack)
+{
+	u32 delta = ack - tp->snd_una;
+
+	tp->bytes_acked += delta;
+	tp->snd_una = ack;
+}
+
 /* Update our send window.
  *
  * Window update algorithm, described in RFC793/RFC1122 (used in linux-2.2
@@ -3426,7 +3435,7 @@ static int tcp_ack_update_window(struct sock *sk, const struct sk_buff *skb, u32
         }
     }
 
-    tp->snd_una = ack;
+	tcp_snd_una_update(tp, ack);
 
     return flag;
 }
@@ -3636,9 +3645,83 @@ static int tcp_ack(struct sock *sk, const struct sk_buff *skb, int flag)
             dst_confirm(dst);
     }
 
-    if (tp->srtt != prior_rtt || tp->snd_cwnd != prior_cwnd)
-        tcp_update_pacing_rate(sk);
-    return 1;
+	/* ts_recent update must be made after we are sure that the packet
+	 * is in window.
+	 */
+	if (flag & FLAG_UPDATE_TS_RECENT)
+		tcp_replace_ts_recent(tp, TCP_SKB_CB(skb)->seq);
+
+	if (!(flag & FLAG_SLOWPATH) && after(ack, prior_snd_una)) {
+		/* Window is constant, pure forward advance.
+		 * No more checks are required.
+		 * Note, we use the fact that SND.UNA>=SND.WL2.
+		 */
+		tcp_update_wl(tp, ack_seq);
+		tcp_snd_una_update(tp, ack);
+		flag |= FLAG_WIN_UPDATE;
+
+		tcp_ca_event(sk, CA_EVENT_FAST_ACK);
+
+		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPHPACKS);
+	} else {
+		if (ack_seq != TCP_SKB_CB(skb)->end_seq)
+			flag |= FLAG_DATA;
+		else
+			NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPPUREACKS);
+
+		flag |= tcp_ack_update_window(sk, skb, ack, ack_seq);
+
+		if (TCP_SKB_CB(skb)->sacked)
+			flag |= tcp_sacktag_write_queue(sk, skb, prior_snd_una);
+
+		if (TCP_ECN_rcv_ecn_echo(tp, tcp_hdr(skb)))
+			flag |= FLAG_ECE;
+
+		tcp_ca_event(sk, CA_EVENT_SLOW_ACK);
+	}
+
+	/* We passed data and got it acked, remove any soft error
+	 * log. Something worked...
+	 */
+	sk->sk_err_soft = 0;
+	icsk->icsk_probes_out = 0;
+	tp->rcv_tstamp = tcp_time_stamp;
+	if (!prior_packets)
+		goto no_queue;
+
+	/* See if we can take anything off of the retransmit queue. */
+	previous_packets_out = tp->packets_out;
+	flag |= tcp_clean_rtx_queue(sk, prior_fackets, prior_snd_una);
+
+	pkts_acked = previous_packets_out - tp->packets_out;
+
+	if (tp->tlp_high_seq)
+		tcp_process_tlp_ack(sk, ack, flag);
+	/* If needed, reset TLP/RTO timer; RACK may later override this. */
+	if (flag & FLAG_SET_XMIT_TIMER)
+		tcp_set_xmit_timer(sk);
+
+	if (tcp_ack_is_dubious(sk, flag)) {
+		/* Advance CWND, if state allows this. */
+		if ((flag & FLAG_DATA_ACKED) && tcp_may_raise_cwnd(sk, flag))
+			tcp_cong_avoid(sk, ack, prior_in_flight);
+		is_dupack = !(flag & (FLAG_SND_UNA_ADVANCED | FLAG_NOT_DUP));
+		tcp_fastretrans_alert(sk, pkts_acked, prior_sacked,
+				      prior_packets, is_dupack, flag);
+	} else {
+		if (flag & FLAG_DATA_ACKED)
+			tcp_cong_avoid(sk, ack, prior_in_flight);
+	}
+
+	if ((flag & FLAG_FORWARD_PROGRESS) || !(flag & FLAG_NOT_DUP)) {
+		struct dst_entry *dst = __sk_dst_get(sk);
+		if (dst)
+			dst_confirm(dst);
+	}
+
+	if (tp->srtt != prior_rtt || tp->snd_cwnd != prior_cwnd)
+		tcp_update_pacing_rate(sk);
+	return 1;
 
 no_queue:
     /* If data was DSACKed, see if we can undo a cwnd reduction. */
