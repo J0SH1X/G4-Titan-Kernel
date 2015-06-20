@@ -1798,6 +1798,9 @@ static ssize_t __cfqg_set_weight_device(struct kernfs_open_file *of,
 	ret = -EINVAL;
 	cfqg = blkg_to_cfqg(ctx.blkg);
 	cfqgd = blkcg_to_cfqgd(blkcg);
+	if (!cfqg || !cfqgd)
+		goto err;
+
 	if (!ctx.v || (ctx.v >= CFQ_WEIGHT_MIN && ctx.v <= CFQ_WEIGHT_MAX)) {
 		if (!is_leaf_weight) {
 			cfqg->dev_weight = ctx.v;
@@ -1809,6 +1812,7 @@ static ssize_t __cfqg_set_weight_device(struct kernfs_open_file *of,
 		ret = 0;
 	}
 
+err:
 	blkg_conf_finish(&ctx);
 	return ret ?: nbytes;
 }
@@ -1831,12 +1835,17 @@ static int __cfq_set_weight(struct cgroup_subsys_state *css, struct cftype *cft,
 	struct blkcg *blkcg = css_to_blkcg(css);
 	struct blkcg_gq *blkg;
 	struct cfq_group_data *cfqgd;
+	int ret = 0;
 
 	if (val < CFQ_WEIGHT_MIN || val > CFQ_WEIGHT_MAX)
 		return -EINVAL;
 
 	spin_lock_irq(&blkcg->lock);
 	cfqgd = blkcg_to_cfqgd(blkcg);
+	if (!cfqgd) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	if (!is_leaf_weight)
 		cfqgd->weight = val;
@@ -1858,8 +1867,9 @@ static int __cfq_set_weight(struct cgroup_subsys_state *css, struct cftype *cft,
 		}
 	}
 
+out:
 	spin_unlock_irq(&blkcg->lock);
-	return 0;
+	return ret;
 }
 
 static int cfq_set_weight(struct cgroup_subsys_state *css, struct cftype *cft,
