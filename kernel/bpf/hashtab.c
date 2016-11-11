@@ -16,7 +16,6 @@
 #include <linux/rculist_nulls.h>
 #include "percpu_freelist.h"
 #include "bpf_lru_list.h"
-#include "map_in_map.h"
 
 #define HTAB_CREATE_FLAG_MASK						\
 	(BPF_F_NO_PREALLOC | BPF_F_RDONLY | BPF_F_WRONLY)
@@ -66,20 +65,6 @@ struct htab_elem {
 	u32 hash;
 	char key[0] __aligned(8);
 };
-
-static bool htab_lru_map_delete_node(void *arg, struct bpf_lru_node *node);
-
-static bool htab_is_lru(const struct bpf_htab *htab)
-{
-	return htab->map.map_type == BPF_MAP_TYPE_LRU_HASH ||
-		htab->map.map_type == BPF_MAP_TYPE_LRU_PERCPU_HASH;
-}
-
-static bool htab_is_percpu(const struct bpf_htab *htab)
-{
-	return htab->map.map_type == BPF_MAP_TYPE_PERCPU_HASH ||
-		htab->map.map_type == BPF_MAP_TYPE_LRU_PERCPU_HASH;
-}
 
 static inline void htab_elem_set_ptr(struct htab_elem *l, u32 key_size,
 				     void __percpu *pptr)
@@ -217,17 +202,7 @@ static int alloc_extra_elems(struct bpf_htab *htab)
 /* Called from syscall */
 static struct bpf_map *htab_map_alloc(union bpf_attr *attr)
 {
-	bool percpu = (attr->map_type == BPF_MAP_TYPE_PERCPU_HASH ||
-		       attr->map_type == BPF_MAP_TYPE_LRU_PERCPU_HASH);
-	bool lru = (attr->map_type == BPF_MAP_TYPE_LRU_HASH ||
-		    attr->map_type == BPF_MAP_TYPE_LRU_PERCPU_HASH);
-	/* percpu_lru means each cpu has its own LRU list.
-	 * it is different from BPF_MAP_TYPE_PERCPU_HASH where
-	 * the map's value itself is percpu.  percpu_lru has
-	 * nothing to do with the map's value.
-	 */
-	bool percpu_lru = (attr->map_flags & BPF_F_NO_COMMON_LRU);
-	bool prealloc = !(attr->map_flags & BPF_F_NO_PREALLOC);
+	bool percpu = attr->map_type == BPF_MAP_TYPE_PERCPU_HASH;
 	struct bpf_htab *htab;
 	int err, i;
 	u64 cost;
@@ -1297,9 +1272,6 @@ static int __init register_htab_map(void)
 {
 	bpf_register_map_type(&htab_type);
 	bpf_register_map_type(&htab_percpu_type);
-	bpf_register_map_type(&htab_lru_type);
-	bpf_register_map_type(&htab_lru_percpu_type);
-	bpf_register_map_type(&htab_of_map_type);
 	return 0;
 }
 late_initcall(register_htab_map);
