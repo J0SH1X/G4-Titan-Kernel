@@ -1156,47 +1156,15 @@ static int check_func_arg(struct bpf_verifier_env *env, u32 regno,
 			verbose("ARG_CONST_SIZE cannot be first argument\n");
 			return -EACCES;
 		}
-
-		/* If the register is UNKNOWN_VALUE, the access check happens
-		 * using its boundaries. Otherwise, just use its imm
-		 */
-		if (type == UNKNOWN_VALUE) {
-			/* For unprivileged variable accesses, disable raw
-			 * mode so that the program is required to
-			 * initialize all the memory that the helper could
-			 * just partially fill up.
-			 */
-			meta = NULL;
-
-			if (reg->min_value < 0) {
-				verbose("R%d min value is negative, either use unsigned or 'var &= const'\n",
-					regno);
-				return -EACCES;
-			}
-
-			if (reg->min_value == 0) {
-				err = check_helper_mem_access(env, regno - 1, 0,
-							      zero_size_allowed,
-							      meta);
-				if (err)
-					return err;
-			}
-
-			if (reg->max_value == BPF_REGISTER_MAX_RANGE) {
-				verbose("R%d unbounded memory access, use 'var &= const' or 'if (var < const)'\n",
-					regno);
-				return -EACCES;
-			}
-			err = check_helper_mem_access(env, regno - 1,
-						      reg->max_value,
-						      zero_size_allowed, meta);
-			if (err)
-				return err;
-		} else {
-			/* register is CONST_IMM */
-			err = check_helper_mem_access(env, regno - 1, reg->imm,
-						      zero_size_allowed, meta);
-		}
+		if (regs[regno - 1].type == PTR_TO_PACKET)
+			err = check_packet_access(env, regno - 1, 0, reg->imm);
+		else if (regs[regno - 1].type == PTR_TO_MAP_VALUE)
+			err = check_map_access(env, regno - 1, 0, reg->imm);
+		else if (regs[regno - 1].type == PTR_TO_MAP_VALUE_ADJ)
+			err = check_map_access_adj(env, regno - 1, 0, reg->imm);
+		else
+			err = check_stack_boundary(env, regno - 1, reg->imm,
+						   zero_size_allowed, meta);
 	}
 
 	return err;
