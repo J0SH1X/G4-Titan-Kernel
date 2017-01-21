@@ -262,7 +262,7 @@ static int trie_update_elem(struct bpf_map *map,
 			    void *_key, void *value, u64 flags)
 {
 	struct lpm_trie *trie = container_of(map, struct lpm_trie, map);
-	struct lpm_trie_node *node, *im_node = NULL, *new_node = NULL;
+	struct lpm_trie_node *node, *im_node, *new_node = NULL;
 	struct lpm_trie_node __rcu **slot;
 	struct bpf_lpm_trie_key *key = _key;
 	unsigned long irq_flags;
@@ -407,8 +407,8 @@ static int trie_delete_elem(struct bpf_map *map, void *key)
 
 static struct bpf_map *trie_alloc(union bpf_attr *attr)
 {
+	size_t cost, cost_per_node;
 	struct lpm_trie *trie;
-	u64 cost = sizeof(*trie), cost_per_node;
 	int ret;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -417,10 +417,9 @@ static struct bpf_map *trie_alloc(union bpf_attr *attr)
 	/* check sanity of attributes */
 	if (attr->max_entries == 0 ||
 	    attr->map_flags != BPF_F_NO_PREALLOC ||
-	    attr->key_size < LPM_KEY_SIZE_MIN ||
-	    attr->key_size > LPM_KEY_SIZE_MAX ||
-	    attr->value_size < LPM_VAL_SIZE_MIN ||
-	    attr->value_size > LPM_VAL_SIZE_MAX)
+	    attr->key_size < sizeof(struct bpf_lpm_trie_key) + 1   ||
+	    attr->key_size > sizeof(struct bpf_lpm_trie_key) + 256 ||
+	    attr->value_size == 0)
 		return ERR_PTR(-EINVAL);
 
 	trie = kzalloc(sizeof(*trie), GFP_USER | __GFP_NOWARN);
@@ -438,24 +437,18 @@ static struct bpf_map *trie_alloc(union bpf_attr *attr)
 
 	cost_per_node = sizeof(struct lpm_trie_node) +
 			attr->value_size + trie->data_size;
-	cost += (u64) attr->max_entries * cost_per_node;
-	if (cost >= U32_MAX - PAGE_SIZE) {
-		ret = -E2BIG;
-		goto out_err;
-	}
-
+	cost = sizeof(*trie) + attr->max_entries * cost_per_node;
 	trie->map.pages = round_up(cost, PAGE_SIZE) >> PAGE_SHIFT;
 
 	ret = bpf_map_precharge_memlock(trie->map.pages);
-	if (ret)
-		goto out_err;
+	if (ret) {
+		kfree(trie);
+		return ERR_PTR(ret);
+	}
 
 	raw_spin_lock_init(&trie->lock);
 
 	return &trie->map;
-out_err:
-	kfree(trie);
-	return ERR_PTR(ret);
 }
 
 static void trie_free(struct bpf_map *map)
@@ -500,15 +493,9 @@ unlock:
 	raw_spin_unlock(&trie->lock);
 }
 
-static int trie_get_next_key(struct bpf_map *map, void *key, void *next_key)
-{
-	return -ENOTSUPP;
-}
-
 static const struct bpf_map_ops trie_ops = {
 	.map_alloc = trie_alloc,
 	.map_free = trie_free,
-	.map_get_next_key = trie_get_next_key,
 	.map_lookup_elem = trie_lookup_elem,
 	.map_update_elem = trie_update_elem,
 	.map_delete_elem = trie_delete_elem,
