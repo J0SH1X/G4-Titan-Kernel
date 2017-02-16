@@ -853,7 +853,10 @@ static void __bpf_prog_put(struct bpf_prog *prog, bool do_idr_lock)
 
 void bpf_prog_put(struct bpf_prog *prog)
 {
-	__bpf_prog_put(prog, true);
+	if (atomic_dec_and_test(&prog->aux->refcnt)) {
+		bpf_prog_kallsyms_del(prog);
+		call_rcu(&prog->aux->rcu, __bpf_prog_put_rcu);
+	}
 }
 EXPORT_SYMBOL_GPL(bpf_prog_put);
 
@@ -1045,18 +1048,6 @@ static int bpf_prog_load(union bpf_attr *attr)
 	err = bpf_prog_alloc_id(prog);
 	if (err)
 		goto free_used_maps;
-
-	err = bpf_prog_new_fd(prog);
-	if (err < 0) {
-		/* failed to allocate fd.
-		 * bpf_prog_put() is needed because the above
-		 * bpf_prog_alloc_id() has published the prog
-		 * to the userspace and the userspace may
-		 * have refcnt-ed it through BPF_PROG_GET_FD_BY_ID.
-		 */
-		bpf_prog_put(prog);
-		return err;
-	}
 
 	bpf_prog_kallsyms_add(prog);
 	return err;
