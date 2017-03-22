@@ -483,7 +483,8 @@ static int map_lookup_elem(union bpf_attr *attr)
 		err = bpf_percpu_array_copy(map, key, value);
 	} else if (map->map_type == BPF_MAP_TYPE_STACK_TRACE) {
 		err = bpf_stackmap_copy(map, key, value);
-	} else if (map->map_type == BPF_MAP_TYPE_ARRAY_OF_MAPS) {
+	} else if (map->map_type == BPF_MAP_TYPE_ARRAY_OF_MAPS ||
+		   map->map_type == BPF_MAP_TYPE_HASH_OF_MAPS) {
 		err = -ENOTSUPP;
 	} else {
 		rcu_read_lock();
