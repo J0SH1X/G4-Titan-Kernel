@@ -288,31 +288,7 @@ int bpf_get_file_flag(int flags)
 		   offsetof(union bpf_attr, CMD##_LAST_FIELD) - \
 		   sizeof(attr->CMD##_LAST_FIELD)) != NULL
 
-/* dst and src must have at least BPF_OBJ_NAME_LEN number of bytes.
- * Return 0 on success and < 0 on error.
- */
-static int bpf_obj_name_cpy(char *dst, const char *src)
-{
-	const char *end = src + BPF_OBJ_NAME_LEN;
-
-	/* Copy all isalnum() and '_' char */
-	while (src < end && *src) {
-		if (!isalnum(*src) && *src != '_')
-			return -EINVAL;
-		*dst++ = *src++;
-	}
-
-	/* No '\0' found in BPF_OBJ_NAME_LEN number of bytes */
-	if (src == end)
-		return -EINVAL;
-
-	/* '\0' terminates dst */
-	*dst = 0;
-
-	return 0;
-}
-
-#define BPF_MAP_CREATE_LAST_FIELD map_name
+#define BPF_MAP_CREATE_LAST_FIELD inner_map_fd
 /* called via syscall */
 static int map_create(union bpf_attr *attr)
 {
@@ -507,8 +483,7 @@ static int map_lookup_elem(union bpf_attr *attr)
 		err = bpf_percpu_array_copy(map, key, value);
 	} else if (map->map_type == BPF_MAP_TYPE_STACK_TRACE) {
 		err = bpf_stackmap_copy(map, key, value);
-	} else if (map->map_type == BPF_MAP_TYPE_ARRAY_OF_MAPS ||
-		   map->map_type == BPF_MAP_TYPE_HASH_OF_MAPS) {
+	} else if (map->map_type == BPF_MAP_TYPE_ARRAY_OF_MAPS) {
 		err = -ENOTSUPP;
 	} else {
 		rcu_read_lock();
