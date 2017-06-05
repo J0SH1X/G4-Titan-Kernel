@@ -86,6 +86,7 @@ enum bpf_cmd {
 	BPF_MAP_GET_NEXT_ID,
 	BPF_PROG_GET_FD_BY_ID,
 	BPF_MAP_GET_FD_BY_ID,
+	BPF_OBJ_GET_INFO_BY_FD,
 };
 
 enum bpf_map_type {
@@ -278,6 +279,12 @@ union bpf_attr {
 		};
 		__u32		next_id;
 	};
+
+	struct { /* anonymous struct used by BPF_OBJ_GET_INFO_BY_FD */
+		__u32		bpf_fd;
+		__u32		info_len;
+		__aligned_u64	info;
+	} info;
 } __attribute__((aligned(8)));
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
@@ -803,11 +810,6 @@ struct bpf_prog_info {
 	__u32 xlated_prog_len;
 	__aligned_u64 jited_prog_insns;
 	__aligned_u64 xlated_prog_insns;
-	__u64 load_time;	/* ns since boottime */
-	__u32 created_by_uid;
-	__u32 nr_map_ids;
-	__aligned_u64 map_ids;
-	char name[BPF_OBJ_NAME_LEN];
 } __attribute__((aligned(8)));
 
 struct bpf_map_info {
@@ -817,33 +819,6 @@ struct bpf_map_info {
 	__u32 value_size;
 	__u32 max_entries;
 	__u32 map_flags;
-	char  name[BPF_OBJ_NAME_LEN];
 } __attribute__((aligned(8)));
-
-/* User bpf_sock_addr struct to access socket fields and sockaddr struct passed
- * by user and intended to be used by socket (e.g. to bind to, depends on
- * attach attach type).
- */
-struct bpf_sock_addr {
-	__u32 user_family;	/* Allows 4-byte read, but no write. */
-	__u32 user_ip4;		/* Allows 1,2,4-byte read and 4-byte write.
-				 * Stored in network byte order.
-				 */
-	__u32 user_ip6[4];	/* Allows 1,2,4-byte read an 4-byte write.
-				 * Stored in network byte order.
-				 */
-	__u32 user_port;	/* Allows 4-byte read and write.
-				 * Stored in network byte order
-				 */
-	__u32 family;		/* Allows 4-byte read, but no write */
-	__u32 type;		/* Allows 4-byte read, but no write */
-	__u32 protocol;		/* Allows 4-byte read, but no write */
-	__u32 msg_src_ip4;	/* Allows 1,2,4-byte read an 4-byte write.
-				 * Stored in network byte order.
-				 */
-	__u32 msg_src_ip6[4];	/* Allows 1,2,4-byte read an 4-byte write.
-				 * Stored in network byte order.
-				 */
-};
 
 #endif /* _UAPI__LINUX_BPF_H__ */
