@@ -812,23 +812,15 @@ static int bpf_prog_alloc_id(struct bpf_prog *prog)
 	return id > 0 ? 0 : id;
 }
 
-static void bpf_prog_free_id(struct bpf_prog *prog, bool do_idr_lock)
+static void bpf_prog_free_id(struct bpf_prog *prog)
 {
 	/* cBPF to eBPF migrations are currently not in the idr store. */
 	if (!prog->aux->id)
 		return;
 
-	if (do_idr_lock)
-		spin_lock_bh(&prog_idr_lock);
-	else
-		__acquire(&prog_idr_lock);
-
+	spin_lock_bh(&prog_idr_lock);
 	idr_remove(&prog_idr, prog->aux->id);
-
-	if (do_idr_lock)
-		spin_unlock_bh(&prog_idr_lock);
-	else
-		__release(&prog_idr_lock);
+	spin_unlock_bh(&prog_idr_lock);
 }
 
 static void __bpf_prog_put_rcu(struct rcu_head *rcu)
@@ -854,6 +846,7 @@ static void __bpf_prog_put(struct bpf_prog *prog, bool do_idr_lock)
 void bpf_prog_put(struct bpf_prog *prog)
 {
 	if (atomic_dec_and_test(&prog->aux->refcnt)) {
+                bpf_prog_free_id(prog);
 		bpf_prog_kallsyms_del(prog);
 		call_rcu(&prog->aux->rcu, __bpf_prog_put_rcu);
 	}
@@ -1049,9 +1042,16 @@ static int bpf_prog_load(union bpf_attr *attr)
 	if (err)
 		goto free_used_maps;
 
+	err = bpf_prog_new_fd(prog);
+	if (err < 0)
+		/* failed to allocate fd */
+		goto free_id;
+
 	bpf_prog_kallsyms_add(prog);
 	return err;
 
+free_id:
+	bpf_prog_free_id(prog);
 free_used_maps:
 	free_used_maps(prog->aux);
 free_prog:
