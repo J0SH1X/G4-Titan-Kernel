@@ -140,19 +140,11 @@ static int bpf_map_alloc_id(struct bpf_map *map)
 	return id > 0 ? 0 : id;
 }
 
-static void bpf_map_free_id(struct bpf_map *map, bool do_idr_lock)
+static void bpf_map_free_id(struct bpf_map *map)
 {
-	if (do_idr_lock)
-		spin_lock_bh(&map_idr_lock);
-	else
-		__acquire(&map_idr_lock);
-
+	spin_lock_bh(&map_idr_lock);
 	idr_remove(&map_idr, map->id);
-
-	if (do_idr_lock)
-		spin_unlock_bh(&map_idr_lock);
-	else
-		__release(&map_idr_lock);
+	spin_unlock_bh(&map_idr_lock);
 }
 
 /* called from workqueue */
@@ -180,8 +172,7 @@ static void bpf_map_put_uref(struct bpf_map *map)
 static void __bpf_map_put(struct bpf_map *map, bool do_idr_lock)
 {
 	if (atomic_dec_and_test(&map->refcnt)) {
-		/* bpf_map_free_id() must be called first */
-		bpf_map_free_id(map, do_idr_lock);
+		bpf_map_free_id(map);
 		INIT_WORK(&map->work, bpf_map_free_deferred);
 		schedule_work(&map->work);
 	}
@@ -329,6 +320,11 @@ static int map_create(union bpf_attr *attr)
 		goto free_map;
 
 	err = bpf_map_new_fd(map, f_flags);
+	if (err < 0)
+		/* failed to allocate fd */
+		goto free_id;
+
+	err = bpf_map_new_fd(map, f_flags);
 	if (err < 0) {
 		/* failed to allocate fd.
 		 * bpf_map_put() is needed because the above
@@ -342,6 +338,8 @@ static int map_create(union bpf_attr *attr)
 
 	return err;
 
+free_id:
+	bpf_map_free_id(map);
 free_map:
 	bpf_map_uncharge_memlock(map);
 free_map_sec:
