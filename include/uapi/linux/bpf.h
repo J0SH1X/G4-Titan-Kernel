@@ -84,9 +84,6 @@ enum bpf_cmd {
 	BPF_PROG_TEST_RUN, // stub
 	BPF_PROG_GET_NEXT_ID,
 	BPF_MAP_GET_NEXT_ID,
-	BPF_PROG_GET_FD_BY_ID,
-	BPF_MAP_GET_FD_BY_ID,
-	BPF_OBJ_GET_INFO_BY_FD,
 };
 
 enum bpf_map_type {
@@ -271,20 +268,10 @@ union bpf_attr {
 		__u32           duration;
 	} test;
 
-	struct { /* anonymous struct used by BPF_*_GET_*_ID */
-		union {
-			__u32		start_id;
-			__u32		prog_id;
-			__u32		map_id;
-		};
+	struct { /* anonymous struct used by BPF_*_GET_NEXT_ID */
+		__u32		start_id;
 		__u32		next_id;
 	};
-
-	struct { /* anonymous struct used by BPF_OBJ_GET_INFO_BY_FD */
-		__u32		bpf_fd;
-		__u32		info_len;
-		__aligned_u64	info;
-	} info;
 } __attribute__((aligned(8)));
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
