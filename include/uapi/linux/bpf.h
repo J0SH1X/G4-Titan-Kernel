@@ -630,6 +630,20 @@ enum bpf_func_id {
 	 */
 	BPF_FUNC_get_socket_uid,
 
+	BPF_FUNC_set_hash, // FIXME: backport if needed
+	BPF_FUNC_setsockopt, // FIXME: backport if needed
+
+	/**
+	 * int bpf_skb_adjust_room(skb, len_diff, mode, flags)
+	 *     Grow or shrink room in sk_buff.
+	 *     @skb: pointer to skb
+	 *     @len_diff: (signed) amount of room to grow/shrink
+	 *     @mode: operation mode (enum bpf_adj_room_mode)
+	 *     @flags: reserved for future use
+	 *     Return: 0 on success or negative error code
+	 */
+	BPF_FUNC_skb_adjust_room,
+
 	BPF_FUNC_ktime_get_boot_ns = BPF_FUNC_get_socket_uid + 78,
 
 	__BPF_FUNC_MAX_ID,
@@ -675,12 +689,6 @@ enum bpf_func_id {
 /* Mode for BPF_FUNC_skb_adjust_room helper. */
 enum bpf_adj_room_mode {
 	BPF_ADJ_ROOM_NET,
-};
-
-/* Mode for BPF_FUNC_skb_load_bytes_relative helper. */
-enum bpf_hdr_start_off {
-	BPF_HDR_START_MAC,
-	BPF_HDR_START_NET,
 };
 
 /* user accessible mirror of in-kernel sk_buff.
