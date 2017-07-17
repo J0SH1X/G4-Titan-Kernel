@@ -254,7 +254,7 @@ static int dev_map_update_elem(struct bpf_map *map, void *key, void *value,
 	return 0;
 }
 
-const struct bpf_map_ops dev_map_ops = {
+static const struct bpf_map_ops dev_map_ops = {
 	.map_alloc = dev_map_alloc,
 	.map_free = dev_map_free,
 	.map_get_next_key = dev_map_get_next_key,
@@ -262,3 +262,15 @@ const struct bpf_map_ops dev_map_ops = {
 	.map_update_elem = dev_map_update_elem,
 	.map_delete_elem = dev_map_delete_elem,
 };
+
+static struct bpf_map_type_list dev_map_type __read_mostly = {
+	.ops = &dev_map_ops,
+	.type = BPF_MAP_TYPE_DEVMAP,
+};
+
+static int __init register_dev_map(void)
+{
+	bpf_register_map_type(&dev_map_type);
+	return 0;
+}
+late_initcall(register_dev_map);
