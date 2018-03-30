@@ -995,7 +995,7 @@ struct bpf_prog *bpf_prog_get_type(u32 ufd, enum bpf_prog_type type)
 EXPORT_SYMBOL_GPL(bpf_prog_get_type);
 
 /* last field in 'union bpf_attr' used by this command */
-#define	BPF_PROG_LOAD_LAST_FIELD prog_name
+#define	BPF_PROG_LOAD_LAST_FIELD expected_attach_type
 
 static int bpf_prog_load(union bpf_attr *attr)
 {
@@ -1190,13 +1190,7 @@ static int bpf_prog_attach(const union bpf_attr *attr)
 		break;
 	case BPF_CGROUP_INET4_BIND:
 	case BPF_CGROUP_INET6_BIND:
-	case BPF_CGROUP_INET4_CONNECT:
-	case BPF_CGROUP_INET6_CONNECT:
-	case BPF_CGROUP_UDP4_SENDMSG:
-	case BPF_CGROUP_UDP6_SENDMSG:
-	case BPF_CGROUP_UDP4_RECVMSG:
-	case BPF_CGROUP_UDP6_RECVMSG:
-               prog = bpf_prog_get_type(attr->attach_bpf_fd,
+                prog = bpf_prog_get_type(attr->attach_bpf_fd,
                                          BPF_PROG_TYPE_CGROUP_SOCK_ADDR);
                 if (IS_ERR(prog))
                         return PTR_ERR(prog);
