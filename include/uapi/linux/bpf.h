@@ -632,65 +632,7 @@ enum bpf_func_id {
 	 */
 	BPF_FUNC_get_socket_uid,
 
-	/**
-	 * int bpf_skb_adjust_room(skb, len_diff, mode, flags)
-	 *     Grow or shrink room in sk_buff.
-	 *     @skb: pointer to skb
-	 *     @len_diff: (signed) amount of room to grow/shrink
-	 *     @mode: operation mode (enum bpf_adj_room_mode)
-	 *     @flags: reserved for future use
-	 *     Return: 0 on success or negative error code
-	 */
-	BPF_FUNC_skb_adjust_room = 50,
-
-	/**
-	 * int bpf_bind(ctx, addr, addr_len)
-	 *     Bind socket to address. Only binding to IP is supported, no port can be
-	 *     set in addr.
-	 *     @ctx: pointer to context of type bpf_sock_addr
-	 *     @addr: pointer to struct sockaddr to bind socket to
-	 *     @addr_len: length of sockaddr structure
-	 *     Return: 0 on success or negative error code
-	 */
-        BPF_FUNC_bind = 64,
-
-	/**
-	 * int skb_load_bytes_relative(const struct sk_buff *skb, u32 offset, void *to, u32 len, u32 start_header)
-	 * 	Description
-	 * 		This helper is similar to **bpf_skb_load_bytes**\ () in that
-	 * 		it provides an easy way to load *len* bytes from *offset*
-	 * 		from the packet associated to *skb*, into the buffer pointed
-	 * 		by *to*. The difference to **bpf_skb_load_bytes**\ () is that
-	 * 		a fifth argument *start_header* exists in order to select a
-	 * 		base offset to start from. *start_header* can be one of:
-	 *
-	 * 		**BPF_HDR_START_MAC**
-	 * 			Base offset to load data from is *skb*'s mac header.
-	 * 		**BPF_HDR_START_NET**
-	 * 			Base offset to load data from is *skb*'s network header.
-	 *
-	 * 		In general, "direct packet access" is the preferred method to
-	 * 		access packet data, however, this helper is in particular useful
-	 * 		in socket filters where *skb*\ **->data** does not always point
-	 * 		to the start of the mac header and where "direct packet access"
-	 * 		is not available.
-	 *
-	 * 	Return
-	 * 		0 on success, or a negative error in case of failure.
-	 *
-	 */
-	BPF_FUNC_skb_load_bytes_relative = 68,
-
-	/**
-	 * u64 bpf_ktime_get_boot_ns(void)
-	 * 	Description
-	 * 		Return the time elapsed since system boot, in nanoseconds.
-	 * 		Does include the time the system was suspended.
-	 * 		See: clock_gettime(CLOCK_BOOTTIME)
-	 * 	Return
-	 * 		Current *ktime*.
-	 */
-	BPF_FUNC_ktime_get_boot_ns = 125,
+	BPF_FUNC_ktime_get_boot_ns = BPF_FUNC_get_socket_uid + 78,
 
 	__BPF_FUNC_MAX_ID,
 };
