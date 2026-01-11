@@ -1783,11 +1783,6 @@ static inline unsigned char *skb_mac_header(const struct sk_buff *skb)
 	return skb->mac_header;
 }
 
-static inline u32 skb_mac_header_len(const struct sk_buff *skb)
-{
-        return skb->network_header - skb->mac_header;
-}
-
 static inline int skb_mac_header_was_set(const struct sk_buff *skb)
 {
 	return skb->mac_header != NULL;
@@ -1803,6 +1798,11 @@ static inline void skb_set_mac_header(struct sk_buff *skb, const int offset)
 	skb->mac_header = skb->data + offset;
 }
 #endif /* NET_SKBUFF_DATA_USES_OFFSET */
+
+static inline u32 skb_mac_header_len(const struct sk_buff *skb)
+{
+        return skb->network_header - skb->mac_header;
+}
 
 static inline void skb_pop_mac_header(struct sk_buff *skb)
 {
