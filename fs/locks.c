@@ -2195,6 +2195,7 @@ out:
 	locks_free_lock(file_lock);
 	return error;
 }
+}
 
 #if BITS_PER_LONG == 32
 /* Report the first existing lock that would conflict with l.
@@ -2363,6 +2364,7 @@ int fcntl_setlk64(unsigned int fd, struct file *filp, unsigned int cmd,
 out:
 	locks_free_lock(file_lock);
 	return error;
+}
 }
 #endif /* BITS_PER_LONG == 32 */
 

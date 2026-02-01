@@ -1799,11 +1799,6 @@ static inline void skb_set_mac_header(struct sk_buff *skb, const int offset)
 }
 #endif /* NET_SKBUFF_DATA_USES_OFFSET */
 
-static inline u32 skb_mac_header_len(const struct sk_buff *skb)
-{
-        return skb->network_header - skb->mac_header;
-}
-
 static inline void skb_pop_mac_header(struct sk_buff *skb)
 {
 	skb->mac_header = skb->network_header;

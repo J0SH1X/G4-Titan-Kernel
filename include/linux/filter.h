@@ -824,13 +824,6 @@ bpf_address_lookup(unsigned long addr, unsigned long *size,
 void bpf_prog_kallsyms_add(struct bpf_prog *fp);
 void bpf_prog_kallsyms_del(struct bpf_prog *fp);
 
-#else /* CONFIG_BPF_JIT */
-
-static inline bool bpf_prog_ebpf_jited(const struct bpf_prog *fp)
-{
-	return false;
-}
-
 static inline void bpf_jit_free(struct bpf_prog *fp)
 {
 	bpf_prog_unlock_free(fp);
