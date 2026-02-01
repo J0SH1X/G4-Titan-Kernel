@@ -2141,7 +2141,7 @@ int fcntl_setlk(unsigned int fd, struct file *filp, unsigned int cmd,
 	default:
 		error = -EINVAL;
 		goto out;
-
+	}
 	/*
 	 * If the cmd is requesting file-private locks, then set the
 	 * FL_OFDLCK flag and override the owner.
@@ -2194,7 +2194,6 @@ int fcntl_setlk(unsigned int fd, struct file *filp, unsigned int cmd,
 out:
 	locks_free_lock(file_lock);
 	return error;
-}
 }
 
 #if BITS_PER_LONG == 32
@@ -2311,6 +2310,7 @@ int fcntl_setlk64(unsigned int fd, struct file *filp, unsigned int cmd,
 	default:
 		error = -EINVAL;
 		goto out;
+	}
 
 	/*
 	 * If the cmd is requesting file-private locks, then set the
@@ -2364,7 +2364,6 @@ int fcntl_setlk64(unsigned int fd, struct file *filp, unsigned int cmd,
 out:
 	locks_free_lock(file_lock);
 	return error;
-}
 }
 #endif /* BITS_PER_LONG == 32 */
 
